@@ -1,23 +1,16 @@
-# `macmon` – Mac Monitor
+# `macmon` – Mac Metrics Monitor Library
 
 <div align="center">
 
-Sudoless performance monitoring CLI tool for Apple Silicon processors.
+Sudoless performance monitoring library for Apple Silicon processors.
 
-[<img src="https://badgen.net/github/assets-dl/vladkens/macmon" />](https://github.com/vladkens/macmon/releases)
-[<img src="https://badgen.net/github/release/vladkens/macmon" />](https://github.com/vladkens/macmon/releases)
 [<img src="https://badgen.net/github/license/vladkens/macmon" />](https://github.com/vladkens/macmon/blob/main/LICENSE)
-[<img src="https://badgen.net/static/-/buy%20me%20a%20coffee/ff813f?icon=buymeacoffee&label" alt="donate" />](https://buymeacoffee.com/vladkens)
 
-</div>
-
-<div align="center">
-  <img src="https://github.com/vladkens/macmon/blob/assets/macmon.png?raw=true" alt="preview" />
 </div>
 
 ## Motivation
 
-Apple Silicon processors don't provide an easy way to see live power consumption. I was interested in this information while testing local LLM models. `asitop` is a nice and simple TUI to quickly see current metrics, but it reads data from `powermetrics` and requires root privileges. `macmon` uses a private macOS API to gather metrics (essentially the same as `powermetrics`) but runs without sudo. 🎉
+Apple Silicon processors don't provide an easy way to see live power consumption. This library uses a private macOS API to gather metrics (essentially the same as `powermetrics`) but runs without sudo privileges. 🎉
 
 ## 🌟 Features
 
@@ -25,90 +18,83 @@ Apple Silicon processors don't provide an easy way to see live power consumption
 - ⚡ Real-time CPU / GPU / ANE power usage
 - 📊 CPU utilization per cluster
 - 💾 RAM / Swap usage
-- 📈 Historical charts + avg / max values
-- 🌡️ Average CPU / GPU temperature
-- 🎨 Switchable colors (6 variants)
-- 🪟 Can be rendered in a small window
-- 🦀 Written in Rust
+- 🌡️ CPU / GPU temperature monitoring
+- 🦀 Written in Rust with Swift and C bindings
 
-## 🍺 Install via Homebrew
+## 📦 Installation
 
-You can install [`macmon`](https://formulae.brew.sh/formula/macmon) using [brew](https://brew.sh/):
-
+1. Clone the repo:
 ```sh
-$ brew install macmon
+git clone https://github.com/razorback16/macmon.git && cd macmon
 ```
 
-## 🖥️ Install via MacPorts
-
-You can also install [`macmon`](https://ports.macports.org/port/macmon/) using [MacPorts](https://macports.org/):
-
+2. Build the library:
 ```sh
-$ sudo port install macmon
-```
-
-## 📦 Install from source
-
-1. Install [Rust toolchain](https://www.rust-lang.org/tools/install)
-
-2. Clone the repo:
-
-```sh
-git clone https://github.com/vladkens/macmon.git && cd macmon
-```
-
-3. Build and run:
-
-```sh
-cargo run -r
-```
-
-4. (Optionally) Binary can be moved to bin folder:
-
-```sh
-sudo cp target/release/macmon /usr/local/bin
+cargo build --release
 ```
 
 ## 🚀 Usage
 
-```sh
-Usage: macmon [OPTIONS] [COMMAND]
+### Swift
 
-Commands:
-  pipe   Output metrics in JSON format
-  debug  Print debug information
-  help   Print this message or the help of the given subcommand(s)
+```swift
+import Foundation
 
-Options:
-  -i, --interval <INTERVAL>  Update interval in milliseconds [default: 1000]
-  -h, --help                 Print help
-  -V, --version              Print version
+// Create MacMon instance
+let monitor = try MacMon()
 
-Controls:
-  c - change color
-  v - switch charts view: gauge / sparkline
-  q - quit
+// Get metrics
+let metrics = try monitor.getMetrics()
+
+// Convert to JSON and print
+let encoder = JSONEncoder()
+encoder.outputFormatting = [.prettyPrinted]
+
+if let jsonData = try? encoder.encode(metrics),
+   let jsonString = String(data: jsonData, encoding: .utf8) {
+    print(jsonString)
+}
 ```
 
-## 🚰 Piping
+### C
 
-You can use the pipe subcommand to output metrics in JSON format, which is suitable for piping into other tools or scripts. For example:
+```c
+#include <stdio.h>
+#include "macmon.h"
 
-```sh
-macmon pipe | jq
+int main() {
+    // Create a new sampler
+    void *sampler = sampler_new();
+    if (!sampler) {
+        printf("Failed to create sampler\n");
+        return 1;
+    }
+
+    // Get metrics
+    Metrics *metrics = sampler_get_metrics(sampler);
+    if (!metrics) {
+        printf("Failed to get metrics\n");
+        sampler_free(sampler);
+        return 1;
+    }
+
+    // Access metrics
+    printf("CPU Temperature: %.2f°C\n", metrics->temp.cpu_temp_avg);
+    printf("GPU Temperature: %.2f°C\n", metrics->temp.gpu_temp_avg);
+    printf("CPU Power: %.2f W\n", metrics->cpu_power);
+    printf("GPU Power: %.2f W\n", metrics->gpu_power);
+
+    // Cleanup
+    metrics_free(metrics);
+    sampler_free(sampler);
+
+    return 0;
+}
 ```
 
-This command runs `macmon` in "pipe" mode and navigate output to `jq` for pretty-printing.
+## 📊 Metrics Structure
 
-You can also specify the number of samples to run using `-s` or `--samples` parameter (default: `0`, which runs indefinitely), and set update interval in milliseconds using the `-i` or `--interval` parameter (default: `1000` ms). For example:
-
-```sh
-macmon pipe -s 10 -i 500 | jq
-```
-
-This will collect 10 samples with an update interval of 500 milliseconds.
-
-### Output
+The library provides the following metrics:
 
 ```jsonc
 {
@@ -131,23 +117,20 @@ This will collect 10 samples with an update interval of 500 milliseconds.
   "all_power": 0.22231553,            // Watts
   "sys_power": 5.876533,              // Watts
   "ram_power": 0.11635789,            // Watts
-  "gpu_ram_power": 0.0009615385       // Watts (not sure what it means)
+  "gpu_ram_power": 0.0009615385       // Watts
 }
 ```
 
 ## 🤝 Contributing
-We love contributions! Whether you have ideas, suggestions, or bug reports, feel free to open an issue or submit a pull request. Your input is essential in helping us improve `macmon` 💪
+We love contributions! Whether you have ideas, suggestions, or bug reports, feel free to open an issue or submit a pull request.
 
 ## 📝 License
-`macmon` is distributed under the MIT License. For more details, check out the LICENSE.
+`macmon` is distributed under the MIT License. See LICENSE for more details.
 
 ## 🔍 See also
-- [tlkh/asitop](https://github.com/tlkh/asitop) – Original tool. Python, requires sudo.
-- [dehydratedpotato/socpowerbud](https://github.com/dehydratedpotato/socpowerbud) – ObjectiveC, sudoless, no TUI.
-- [op06072/NeoAsitop](https://github.com/op06072/NeoAsitop) – Swift, sudoless.
-- [graelo/pumas](https://github.com/graelo/pumas) – Rust, requires sudo.
-- [context-labs/mactop](https://github.com/context-labs/mactop) – Go, requires sudo.
-
----
-
-*PS: One More Thing... Remember, monitoring your Mac's performance with `macmon` is like having a personal trainer for your processor — keeping those cores in shape! 💪*
+- [vladkens/macmon](https://github.com/vladkens/macmon) – The main project from which it's forked
+- [tlkh/asitop](https://github.com/tlkh/asitop) – Performance monitoring tool written in Python
+- [dehydratedpotato/socpowerbud](https://github.com/dehydratedpotato/socpowerbud) – ObjectiveC performance monitor
+- [op06072/NeoAsitop](https://github.com/op06072/NeoAsitop) – Performance monitor written in Swift
+- [graelo/pumas](https://github.com/graelo/pumas) – Performance monitor written in Rust
+- [context-labs/mactop](https://github.com/context-labs/mactop) – Performance monitor written in Go
