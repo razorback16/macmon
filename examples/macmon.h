@@ -10,6 +10,22 @@ extern "C"
 
     typedef struct
     {
+        uint8_t mac_model[64]; // Fixed size buffer for C string
+        uint8_t chip_name[64]; // Fixed size buffer for C string
+        uint8_t memory_gb;
+        uint8_t ecpu_cores;
+        uint8_t pcpu_cores;
+        uint32_t ecpu_freqs[32]; // Fixed size array for frequencies
+        uint32_t pcpu_freqs[32];
+        uint8_t gpu_cores;
+        uint32_t gpu_freqs[32];
+        uint8_t ecpu_freqs_count; // Actual number of frequencies
+        uint8_t pcpu_freqs_count;
+        uint8_t gpu_freqs_count;
+    } SocInfo;
+
+    typedef struct
+    {
         float cpu_temp_avg;
         float gpu_temp_avg;
     } Temperature;
@@ -56,6 +72,12 @@ extern "C"
 
     // Free the metrics instance
     void metrics_free(Metrics *metrics);
+
+    // Get SOC information
+    SocInfo *get_soc_info(void);
+
+    // Free the SOC information
+    void soc_info_free(SocInfo *info);
 
 #ifdef __cplusplus
 }

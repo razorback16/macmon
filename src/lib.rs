@@ -3,6 +3,22 @@ mod metrics;
 mod sources;
 
 #[repr(C)]
+pub struct SocInfo {
+  pub mac_model: [u8; 64], // Fixed size buffer for C string
+  pub chip_name: [u8; 64], // Fixed size buffer for C string
+  pub memory_gb: u8,
+  pub ecpu_cores: u8,
+  pub pcpu_cores: u8,
+  pub ecpu_freqs: [u32; 32], // Fixed size array for frequencies
+  pub pcpu_freqs: [u32; 32],
+  pub gpu_cores: u8,
+  pub gpu_freqs: [u32; 32],
+  pub ecpu_freqs_count: u8, // Actual number of frequencies
+  pub pcpu_freqs_count: u8,
+  pub gpu_freqs_count: u8,
+}
+
+#[repr(C)]
 pub struct Temperature {
   cpu_temp_avg: f32,
   gpu_temp_avg: f32,
@@ -111,6 +127,56 @@ pub extern "C" fn metrics_free(metrics: *mut Metrics) {
   if !metrics.is_null() {
     unsafe {
       drop(Box::from_raw(metrics));
+    }
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn get_soc_info() -> *mut SocInfo {
+  match sources::get_soc_info() {
+    Ok(src_info) => {
+      let mut info = Box::new(SocInfo {
+        mac_model: [0; 64],
+        chip_name: [0; 64],
+        memory_gb: src_info.memory_gb,
+        ecpu_cores: src_info.ecpu_cores,
+        pcpu_cores: src_info.pcpu_cores,
+        ecpu_freqs: [0; 32],
+        pcpu_freqs: [0; 32],
+        gpu_cores: src_info.gpu_cores,
+        gpu_freqs: [0; 32],
+        ecpu_freqs_count: src_info.ecpu_freqs.len() as u8,
+        pcpu_freqs_count: src_info.pcpu_freqs.len() as u8,
+        gpu_freqs_count: src_info.gpu_freqs.len() as u8,
+      });
+
+      // Copy strings with truncation if needed
+      let mac_model = src_info.mac_model.as_bytes();
+      let chip_name = src_info.chip_name.as_bytes();
+      info.mac_model[..mac_model.len().min(63)]
+        .copy_from_slice(&mac_model[..mac_model.len().min(63)]);
+      info.chip_name[..chip_name.len().min(63)]
+        .copy_from_slice(&chip_name[..chip_name.len().min(63)]);
+
+      // Copy frequency arrays
+      info.ecpu_freqs[..src_info.ecpu_freqs.len().min(32)]
+        .copy_from_slice(&src_info.ecpu_freqs[..src_info.ecpu_freqs.len().min(32)]);
+      info.pcpu_freqs[..src_info.pcpu_freqs.len().min(32)]
+        .copy_from_slice(&src_info.pcpu_freqs[..src_info.pcpu_freqs.len().min(32)]);
+      info.gpu_freqs[..src_info.gpu_freqs.len().min(32)]
+        .copy_from_slice(&src_info.gpu_freqs[..src_info.gpu_freqs.len().min(32)]);
+
+      Box::into_raw(info)
+    }
+    Err(_) => std::ptr::null_mut(),
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn soc_info_free(info: *mut SocInfo) {
+  if !info.is_null() {
+    unsafe {
+      drop(Box::from_raw(info));
     }
   }
 }
